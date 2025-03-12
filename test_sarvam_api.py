@@ -1,5 +1,6 @@
 import os
 import requests
+import base64
 
 # Load API key from environment variable
 api_key = os.getenv("SARVAM_API_KEY")  # ✅ Ensure this is set in your environment
@@ -52,11 +53,11 @@ def speech_to_text_translate(api_key, file_path, model="saaras:v1", prompt=""):
         return None
 
 
-def text_to_speech(api_key, text, target_language_code="hi-IN", speaker="meera", speech_sample_rate=8000, enable_preprocessing=True):
+def text_to_speech(api_key, text, target_language_code="en-IN", speaker="meera", speech_sample_rate=8000, enable_preprocessing=True):
     url = "https://api.sarvam.ai/text-to-speech"
     payload = {
         "inputs": [text],
-        "target_language_code": target_language_code,
+        "target_language_code": target_language_code,  # Ensure this is 'en-IN' for English
         "speaker": speaker,
         "speech_sample_rate": speech_sample_rate,
         "enable_preprocessing": enable_preprocessing,
@@ -71,12 +72,21 @@ def text_to_speech(api_key, text, target_language_code="hi-IN", speaker="meera",
     response = requests.post(url, headers=headers, json=payload)
 
     if response.status_code == 200:
-        output_file = "generated_speech.wav"
-        with open(output_file, "wb") as f:
-            f.write(response.content)  # ✅ Save the audio response as a file
+        # Parse the base64 audio data from the response
+        response_json = response.json()
+        audio_base64 = response_json.get("audios", [None])[0]
         
-        print(f"Generated Speech saved as: {output_file}")
-        return output_file  # ✅ Return the file path instead of raw binary
+        if audio_base64:
+            # Decode the base64 string and save it as a WAV file
+            output_file = "generated_speech.wav"
+            with open(output_file, "wb") as f:
+                f.write(base64.b64decode(audio_base64))  # Decode and write to file
+            
+            print(f"Generated Speech saved as: {output_file}")
+            return output_file  # Return the file path instead of raw binary
+        else:
+            print("Error: No audio data found in the response.")
+            return None
     else:
         print(f"Error in Text-to-Speech API: {response.status_code}, {response.text}")
         return None
@@ -99,6 +109,6 @@ if translated_text:
     print("Translated Text:", translated_text)
 
 # ✅ Process text-to-speech
-audio_output = text_to_speech(api_key, "Hello, how are you?")
+audio_output = text_to_speech(api_key, translated_text)  # Pass the translated text here
 if audio_output:
     print("Generated Speech File:", audio_output)
